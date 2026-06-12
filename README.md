@@ -174,3 +174,45 @@ Build da imagem (multi-stage, definida no `Dockerfile`):
 
 > O `docker-compose.yml` (sem sufixo) continua sendo o de **desenvolvimento** — só o Postgres
 > na porta 5433, com backend e frontend rodando no host via `npm run dev`.
+
+### HTTPS automático (Caddy + Let's Encrypt)
+
+Para expor com domínio e TLS, use o `docker-compose.caddy.yml`: ele sobe app + Postgres
+(**sem portas no host**) + Caddy nas portas 80/443, que emite e renova o certificado sozinho.
+
+```bash
+cp .env.prod.example .env     # defina POSTGRES_PASSWORD e DOMAIN (TLS_EMAIL é opcional)
+# aponte o DNS (A/AAAA) do domínio para o IP da VPS e então:
+docker compose -f docker-compose.caddy.yml up -d --build
+```
+
+Pronto: `https://SEU_DOMINIO` serve UI + API com HTTPS, e o webhook da Cloud API fica em
+`https://SEU_DOMINIO/api/webhook`.
+
+## CI/CD (GitHub Actions)
+
+O workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) roda a cada push na `main`:
+
+1. **test** — sobe um Postgres, roda a migração + o smoke-test do backend (30 checagens) e o build do frontend;
+2. **deploy** — se os testes passarem, conecta na VPS por SSH, faz `git pull` e `docker compose -f docker-compose.caddy.yml up -d --build`.
+
+O deploy só executa quando os **secrets** abaixo existem (sem eles, o job é pulado sem erro):
+
+| Secret | Descrição |
+|---|---|
+| `VPS_HOST` | IP ou host da VPS |
+| `VPS_USER` | usuário SSH |
+| `VPS_SSH_KEY` | conteúdo da chave **privada** SSH com acesso à VPS |
+| `VPS_PORT` | porta SSH (opcional, padrão `22`) |
+| `VPS_APP_DIR` | caminho do repositório clonado na VPS |
+
+Setup único na VPS (Docker instalado):
+
+```bash
+git clone https://github.com/vs-vinisiqueira/nexus-CRM.git && cd nexus-CRM
+cp .env.prod.example .env     # ajuste senha / domínio / chaves
+# garanta que a chave pública correspondente a VPS_SSH_KEY esteja em ~/.ssh/authorized_keys
+```
+
+Cadastre os secrets em **Settings → Secrets and variables → Actions** no GitHub. A partir daí,
+todo push na `main` testa e (com os secrets) faz deploy automático.

@@ -1,0 +1,15 @@
+# Caddy como proxy reverso com HTTPS automático (Let's Encrypt).
+#
+# O domínio vem da variável DOMAIN (definida no .env). Antes de subir, aponte o
+# DNS (registro A / AAAA) do seu domínio para o IP da VPS — o Caddy emite e
+# renova o certificado TLS sozinho no primeiro acesso.
+#
+# Para receber avisos de expiração, descomente o bloco global e defina TLS_EMAIL:
+# {
+# 	email {$TLS_EMAIL}
+# }
+
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:3001
+}
