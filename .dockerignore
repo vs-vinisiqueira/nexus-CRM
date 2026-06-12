@@ -1,0 +1,16 @@
+# dependências e artefatos (reconstruídos dentro da imagem)
+**/node_modules
+**/dist
+backend/public
+
+# segredos — nunca entram na imagem
+**/.env
+**/.env.local
+**/.env.*.local
+
+# git / editor / logs
+.git
+.gitignore
+.claude
+**/*.log
+.DS_Store

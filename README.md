@@ -147,3 +147,30 @@ Setup:
 4. Assine os campos `messages` no webhook.
 
 O recebimento cai direto no histórico do lead, abre a janela de 24h e promove `contatado → respondeu`.
+
+## Deploy (produção / VPS)
+
+Em produção, a **API e a UI rodam no mesmo container**: o build do frontend é servido pelo
+próprio Express (com fallback de SPA para o React Router). O `docker-compose.prod.yml` sobe o
+app + Postgres, com o banco acessível apenas na rede interna.
+
+```bash
+# no servidor (com Docker instalado):
+cp .env.prod.example .env        # ajuste POSTGRES_PASSWORD e, se quiser, as chaves
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+- UI + API ficam em `http://SEU_IP:${APP_PORT}` (padrão `3001`).
+- A migração do banco roda sozinha no start do container (idempotente).
+- As chaves de API podem ficar no `.env` **ou** ser cadastradas pela aba **Configurações**.
+- **Recomendado:** colocar um proxy reverso (nginx / Caddy / Traefik) na frente para HTTPS.
+  Para a Cloud API, o webhook precisa de uma URL pública HTTPS apontando para `/api/webhook`.
+
+Build da imagem (multi-stage, definida no `Dockerfile`):
+
+1. `node:20-alpine` builda o frontend (`vite build` → `dist/`);
+2. `node:20-alpine` instala só as deps de produção do backend e copia o `dist/` para
+   `backend/public`, servido pelo Express.
+
+> O `docker-compose.yml` (sem sufixo) continua sendo o de **desenvolvimento** — só o Postgres
+> na porta 5433, com backend e frontend rodando no host via `npm run dev`.
