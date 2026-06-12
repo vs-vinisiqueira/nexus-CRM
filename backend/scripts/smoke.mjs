@@ -6,11 +6,15 @@ const base = process.argv[2] || 'http://localhost:3001';
 
 let passed = 0;
 let failed = 0;
+let authToken = null;
 
 async function call(method, path, body) {
+  const headers = {};
+  if (body) headers['content-type'] = 'application/json';
+  if (authToken) headers.authorization = `Bearer ${authToken}`;
   const res = await fetch(`${base}${path}`, {
     method,
-    headers: body ? { 'content-type': 'application/json' } : undefined,
+    headers: Object.keys(headers).length ? headers : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
@@ -41,8 +45,23 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('\n# health & settings');
+  console.log('\n# health & autenticação');
   check('GET /health', (await call('GET', '/health')).json?.ok === true);
+
+  const noAuth = await call('GET', '/api/stats');
+  check('rota protegida sem token -> 401', noAuth.status === 401, noAuth);
+
+  const badLogin = await call('POST', '/api/auth/login', { username: 'admin', password: 'errada' });
+  check('login com senha errada -> 401', badLogin.status === 401, badLogin);
+
+  const login = await call('POST', '/api/auth/login', { username: 'admin', password: 'admin' });
+  check('login admin/admin -> token', login.status === 200 && Boolean(login.json.token), login.json);
+  authToken = login.json.token;
+
+  const me = await call('GET', '/api/auth/me');
+  check('GET /api/auth/me autenticado', me.status === 200 && me.json.user?.username === 'admin', me.json);
+
+  console.log('\n# settings');
   const settings = await call('GET', '/api/settings');
   check('GET /api/settings', settings.status === 200 && 'SERPAPI_KEY' in settings.json, settings.json);
 

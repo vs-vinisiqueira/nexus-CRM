@@ -16,6 +16,8 @@ LGPD**. Isso muda uma decisão central de arquitetura em relação à ideia orig
 - ✅ **IA gera rascunhos** de mensagem personalizados por segmento — um humano revisa e envia.
 - ✅ **Handoff humano** via link `wa.me` com o resumo da conversa.
 - ✅ **Dashboard** React + Tailwind: visão geral, leads, coleta, atendentes e configurações.
+- ✅ **Autenticação** — login com sessão protege todas as rotas (exceto `/health`, login e o
+  webhook da Meta). Hash de senha com scrypt + tokens de sessão opacos em banco.
 - ✅ **WhatsApp Cloud API (oficial)** para conversas com leads que deram opt-in — envio com
   travas de conformidade (janela de 24h / template) e webhook de recebimento.
 - ❌ **Não há** disparo automático em massa via Baileys nem camada "anti-banimento".
@@ -70,6 +72,9 @@ npm run dev                # dashboard em http://localhost:5173
 As chaves de **SerpAPI** (coleta) e **Anthropic** (rascunhos com IA) podem ser cadastradas
 depois, pela aba **Configurações** do dashboard — ficam salvas no banco. Sem a SerpAPI, a
 coleta avisa que precisa da chave; sem a Anthropic, os rascunhos usam um template.
+
+**Login:** a primeira migração cria um usuário admin (`ADMIN_USERNAME`/`ADMIN_PASSWORD`, padrão
+`admin`/`admin`). **Troque a senha em produção** definindo `ADMIN_PASSWORD` antes da 1ª migração.
 
 ## Estrutura
 

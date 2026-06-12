@@ -1,11 +1,34 @@
 /** Cliente fino da API Nexus. Usa o proxy do Vite (/api -> backend:3001). */
 
+const TOKEN_KEY = 'nexus_token';
+
+export const auth = {
+  get token() {
+    return localStorage.getItem(TOKEN_KEY);
+  },
+  set(token) {
+    localStorage.setItem(TOKEN_KEY, token);
+  },
+  clear() {
+    localStorage.removeItem(TOKEN_KEY);
+  },
+};
+
 async function req(method, path, body) {
+  const headers = {};
+  if (body) headers['content-type'] = 'application/json';
+  if (auth.token) headers.authorization = `Bearer ${auth.token}`;
+
   const res = await fetch(path, {
     method,
-    headers: body ? { 'content-type': 'application/json' } : undefined,
+    headers: Object.keys(headers).length ? headers : undefined,
     body: body ? JSON.stringify(body) : undefined,
   });
+
+  if (res.status === 401) {
+    auth.clear();
+    window.dispatchEvent(new Event('nexus-unauthorized'));
+  }
   if (res.status === 204) return null;
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -18,6 +41,22 @@ async function req(method, path, body) {
 }
 
 export const api = {
+  // auth
+  login: async (username, password) => {
+    const data = await req('POST', '/api/auth/login', { username, password });
+    auth.set(data.token);
+    return data.user;
+  },
+  logout: async () => {
+    try {
+      await req('POST', '/api/auth/logout');
+    } catch {
+      /* sessão já pode ter expirado */
+    }
+    auth.clear();
+  },
+  me: () => req('GET', '/api/auth/me'),
+
   // stats
   stats: () => req('GET', '/api/stats'),
 

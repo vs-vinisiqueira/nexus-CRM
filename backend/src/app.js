@@ -11,6 +11,8 @@ import { settingsRouter } from './routes/settings.js';
 import { statsRouter } from './routes/stats.js';
 import { webhookRouter } from './routes/webhook.js';
 import { whatsappRouter } from './routes/whatsapp.js';
+import { authRouter } from './routes/auth.js';
+import { requireAuth } from './services/auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -21,12 +23,18 @@ export function createApp() {
 
   app.get('/health', (_req, res) => res.json({ ok: true }));
 
+  // Rotas públicas: login e webhook da Meta (este tem seu próprio verify token).
+  app.use('/api/auth', authRouter);
+  app.use('/api/webhook', webhookRouter); // Cloud API: verificação + recebimento
+
+  // Tudo abaixo exige sessão válida.
+  app.use('/api', requireAuth);
+
   app.use('/api/leads', leadsRouter);
   app.use('/api/attendants', attendantsRouter);
   app.use('/api/collect', collectRouter);
   app.use('/api/settings', settingsRouter);
   app.use('/api/stats', statsRouter);
-  app.use('/api/webhook', webhookRouter); // Cloud API: verificação + recebimento
   app.use('/api', assignmentsRouter); // expõe /api/leads/:id/assign
   app.use('/api', whatsappRouter); // opt-in + envio via Cloud API
 
