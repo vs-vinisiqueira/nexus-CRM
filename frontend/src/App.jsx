@@ -66,6 +66,9 @@ function Sidebar({ user, onLogout }) {
 export default function App() {
   // undefined = verificando sessão; null = deslogado; objeto = logado
   const [user, setUser] = useState(undefined);
+  // true = não conseguimos falar com o servidor (não é sessão inválida)
+  const [netError, setNetError] = useState(false);
+  const [nonce, setNonce] = useState(0); // bump para reexecutar o bootstrap
 
   useEffect(() => {
     let active = true;
@@ -76,9 +79,19 @@ export default function App() {
       }
       try {
         const { user: u } = await api.me();
-        if (active) setUser(u);
-      } catch {
-        if (active) setUser(null);
+        if (active) {
+          setNetError(false);
+          setUser(u);
+        }
+      } catch (err) {
+        if (!active) return;
+        if (err && err.status === 401) {
+          // Sessão inválida — o token já foi limpo em req(). Vai para o Login.
+          setUser(null);
+        } else {
+          // Falha de rede/servidor: NÃO descarta o token; oferece tentar de novo.
+          setNetError(true);
+        }
       }
     }
     bootstrap();
@@ -89,11 +102,28 @@ export default function App() {
       active = false;
       window.removeEventListener('nexus-unauthorized', onUnauthorized);
     };
-  }, []);
+  }, [nonce]);
 
   async function handleLogout() {
     await api.logout();
     setUser(null);
+  }
+
+  if (netError && user === undefined) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 text-center">
+        <p className="text-sm text-slate-600">Não foi possível conectar ao servidor.</p>
+        <button
+          onClick={() => {
+            setNetError(false);
+            setNonce((n) => n + 1);
+          }}
+          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+        >
+          Tentar de novo
+        </button>
+      </div>
+    );
   }
 
   if (user === undefined) {

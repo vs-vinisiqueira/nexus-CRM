@@ -16,10 +16,13 @@ authRouter.post('/login', async (req, res, next) => {
     if (!username || !password) {
       return res.status(400).json({ error: 'username e password são obrigatórios' });
     }
-    const { rows } = await query('SELECT * FROM users WHERE username = $1', [username]);
+    const { rows } = await query(
+      'SELECT id, username, role, password_hash FROM users WHERE username = $1',
+      [username]
+    );
     const user = rows[0];
     // Mesma resposta para usuário inexistente ou senha errada (evita enumeração).
-    if (!user || !verifyPassword(password, user.password_hash)) {
+    if (!user || !(await verifyPassword(password, user.password_hash))) {
       return res.status(401).json({ error: 'credenciais inválidas' });
     }
     const { token, expiresAt } = await createSession(user.id);

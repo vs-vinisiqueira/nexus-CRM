@@ -19,7 +19,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export function createApp() {
   const app = express();
   app.use(cors());
-  app.use(express.json());
+  // Guarda os bytes crus do corpo — necessários para validar a assinatura HMAC
+  // que a Meta envia no webhook (precisa do payload exato, não do re-serializado).
+  app.use(express.json({ verify: (req, _res, buf) => { req.rawBody = buf; } }));
 
   app.get('/health', (_req, res) => res.json({ ok: true }));
 

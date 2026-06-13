@@ -3,23 +3,27 @@
  * Usa apenas o módulo `crypto` nativo — sem dependências externas.
  */
 import crypto from 'node:crypto';
+import { promisify } from 'node:util';
 import { query } from '../db/pool.js';
+
+// scrypt assíncrono: roda no thread pool do libuv e NÃO bloqueia o event loop.
+const scrypt = promisify(crypto.scrypt);
 
 const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 dias
 
 /** Gera "salt:hash" para guardar no banco. */
-export function hashPassword(password) {
+export async function hashPassword(password) {
   const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  const hash = (await scrypt(password, salt, 64)).toString('hex');
   return `${salt}:${hash}`;
 }
 
 /** Compara senha em texto com o "salt:hash" guardado (tempo constante). */
-export function verifyPassword(password, stored) {
+export async function verifyPassword(password, stored) {
   const [salt, hash] = String(stored).split(':');
   if (!salt || !hash) return false;
   const expected = Buffer.from(hash, 'hex');
-  const actual = crypto.scryptSync(password, salt, 64);
+  const actual = await scrypt(password, salt, 64);
   return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
 }
 
@@ -32,6 +36,10 @@ export async function createSession(userId) {
     userId,
     expiresAt,
   ]);
+  // Limpeza oportunista de sessões expiradas — mantém a tabela enxuta sem precisar de cron.
+  query('DELETE FROM sessions WHERE expires_at < now()').catch((err) =>
+    console.warn('[auth] limpeza de sessões expiradas falhou:', err.message)
+  );
   return { token, expiresAt };
 }
 
@@ -53,19 +61,24 @@ export async function deleteSession(token) {
 
 /** Cria o usuário admin inicial se ainda não houver nenhum usuário. */
 export async function seedAdminIfEmpty() {
+  // Checagem barata para o caso comum (já populado): evita calcular o hash à toa.
   const { rows } = await query('SELECT COUNT(*)::int AS c FROM users');
   if (rows[0].c > 0) return null;
   const username = process.env.ADMIN_USERNAME || 'admin';
   const password = process.env.ADMIN_PASSWORD || 'admin';
-  await query('INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3)', [
-    username,
-    hashPassword(password),
-    'admin',
-  ]);
+  // ON CONFLICT torna o seed atômico: se dois migrates correrem em paralelo,
+  // o segundo vira no-op (rowCount 0) em vez de quebrar com unique_violation.
+  const { rowCount } = await query(
+    `INSERT INTO users (username, password_hash, role)
+     VALUES ($1, $2, 'admin')
+     ON CONFLICT (username) DO NOTHING`,
+    [username, await hashPassword(password)]
+  );
+  if (rowCount === 0) return null; // outro processo criou o admin primeiro
   return { username, usedDefaultPassword: !process.env.ADMIN_PASSWORD };
 }
 
-function bearerToken(req) {
+export function bearerToken(req) {
   const header = req.headers.authorization || '';
   return header.startsWith('Bearer ') ? header.slice(7) : null;
 }

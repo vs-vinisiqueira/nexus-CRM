@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { Router } from 'express';
 import { query } from '../db/pool.js';
 import { getSetting } from '../services/settings.js';
@@ -5,6 +6,20 @@ import { logActivity } from '../services/activity.js';
 import { normalizePhoneBR } from '../utils/whatsapp.js';
 
 export const webhookRouter = Router();
+
+/**
+ * Valida o cabeçalho X-Hub-Signature-256 que a Meta assina com o App Secret
+ * sobre os bytes crus do corpo. Comparação em tempo constante.
+ */
+export function verifyMetaSignature(req, appSecret) {
+  const header = req.get('x-hub-signature-256') || '';
+  if (!header.startsWith('sha256=')) return false;
+  const raw = req.rawBody;
+  if (!raw || !raw.length) return false;
+  const provided = Buffer.from(header.slice('sha256='.length), 'hex');
+  const expected = crypto.createHmac('sha256', appSecret).update(raw).digest();
+  return provided.length === expected.length && crypto.timingSafeEqual(provided, expected);
+}
 
 /**
  * GET /api/webhook — handshake de verificação da Meta.
@@ -85,6 +100,19 @@ async function processEvents(payload) {
  * (a Meta reenvia em caso de erro/timeout).
  */
 webhookRouter.post('/', async (req, res) => {
+  // Rota pública (a Meta não envia Bearer): a autenticidade vem da assinatura HMAC.
+  const appSecret = await getSetting('WHATSAPP_APP_SECRET');
+  if (appSecret) {
+    if (!verifyMetaSignature(req, appSecret)) {
+      console.warn('[webhook] assinatura inválida — payload rejeitado');
+      return res.sendStatus(403);
+    }
+  } else {
+    console.warn(
+      '[webhook] WHATSAPP_APP_SECRET não configurado — recebendo sem validar assinatura'
+    );
+  }
+
   try {
     await processEvents(req.body);
   } catch (err) {

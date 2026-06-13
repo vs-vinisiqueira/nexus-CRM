@@ -15,9 +15,10 @@ export const auth = {
 };
 
 async function req(method, path, body) {
+  const hadToken = Boolean(auth.token);
   const headers = {};
   if (body) headers['content-type'] = 'application/json';
-  if (auth.token) headers.authorization = `Bearer ${auth.token}`;
+  if (hadToken) headers.authorization = `Bearer ${auth.token}`;
 
   const res = await fetch(path, {
     method,
@@ -25,7 +26,9 @@ async function req(method, path, body) {
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  if (res.status === 401) {
+  // Só tratamos 401 como "sessão expirou" quando havia um token. Um 401 numa
+  // tentativa de login (sem token) é credencial errada — quem chamou trata o erro.
+  if (res.status === 401 && hadToken) {
     auth.clear();
     window.dispatchEvent(new Event('nexus-unauthorized'));
   }
@@ -44,6 +47,9 @@ export const api = {
   // auth
   login: async (username, password) => {
     const data = await req('POST', '/api/auth/login', { username, password });
+    if (!data || !data.token) {
+      throw new Error('Resposta de login inválida do servidor.');
+    }
     auth.set(data.token);
     return data.user;
   },
