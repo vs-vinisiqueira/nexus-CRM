@@ -14,6 +14,7 @@ const ENV_FALLBACK = {
   WHATSAPP_TOKEN: () => process.env.WHATSAPP_TOKEN,
   WHATSAPP_PHONE_ID: () => process.env.WHATSAPP_PHONE_ID,
   WHATSAPP_VERIFY_TOKEN: () => process.env.WHATSAPP_VERIFY_TOKEN,
+  WHATSAPP_APP_SECRET: () => process.env.WHATSAPP_APP_SECRET,
 };
 
 /** @returns {Promise<string|null>} */
