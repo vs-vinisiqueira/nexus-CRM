@@ -171,6 +171,10 @@ docker compose -f docker-compose.prod.yml up -d --build
 - **Recomendado:** colocar um proxy reverso (nginx / Caddy / Traefik) na frente para HTTPS.
   Para a Cloud API, o webhook precisa de uma URL pública HTTPS apontando para `/api/webhook`.
 
+> **Servidor Windows (Docker Desktop)?** Veja o guia passo a passo, incluindo como deixar
+> **sempre no ar** após reboot e o script de deploy/atualização em um comando:
+> [`deploy/windows-server.md`](deploy/windows-server.md) (`./deploy/deploy.ps1`).
+
 Build da imagem (multi-stage, definida no `Dockerfile`):
 
 1. `node:20-alpine` builda o frontend (`vite build` → `dist/`);
