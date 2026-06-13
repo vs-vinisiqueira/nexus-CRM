@@ -78,7 +78,7 @@ export async function seedAdminIfEmpty() {
   return { username, usedDefaultPassword: !process.env.ADMIN_PASSWORD };
 }
 
-function bearerToken(req) {
+export function bearerToken(req) {
   const header = req.headers.authorization || '';
   return header.startsWith('Bearer ') ? header.slice(7) : null;
 }

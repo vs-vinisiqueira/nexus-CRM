@@ -11,7 +11,7 @@ export const webhookRouter = Router();
  * Valida o cabeçalho X-Hub-Signature-256 que a Meta assina com o App Secret
  * sobre os bytes crus do corpo. Comparação em tempo constante.
  */
-function verifyMetaSignature(req, appSecret) {
+export function verifyMetaSignature(req, appSecret) {
   const header = req.get('x-hub-signature-256') || '';
   if (!header.startsWith('sha256=')) return false;
   const raw = req.rawBody;
